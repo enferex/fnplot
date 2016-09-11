@@ -22,7 +22,7 @@ $(APP): $(OBJS)
 
 .PHONY: test
 test: $(APP)
-	./$(APP) cscope.out
+	./$(APP) -c cscope.out -f "foo" -o foo.dot
 
 clean:
 	$(RM) $(APP) $(OBJS)
