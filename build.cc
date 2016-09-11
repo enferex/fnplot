@@ -63,7 +63,11 @@ static bool is_caller_of(db_t *db, const char *a, const char *b)
 }
 
 // Collect all of the callers to 'fn_name'
-static void print_callers_rec(db_t *db, const char *fn_name, int depth)
+static void print_callers_rec(
+    FILE       *out,
+    db_t       *db,
+    const char *fn_name,
+    int         depth)
 {
     if (depth <= 0)
         return;
@@ -72,8 +76,8 @@ static void print_callers_rec(db_t *db, const char *fn_name, int depth)
         const char *item = pr.first.c_str();
         // Does 'item' call 'fn_name' ?
         if (is_caller_of(db, item, fn_name)) {
-            cout << item << " -> " << fn_name << endl;
-            print_callers_rec(db, item, depth - 1);
+            fprintf(out, "    %s -> %s\n", item, fn_name);
+            print_callers_rec(out, db, item, depth - 1);
         }
     }
 }
@@ -81,10 +85,37 @@ static void print_callers_rec(db_t *db, const char *fn_name, int depth)
 #ifdef __cplusplus
 extern "C"
 #endif
-void print_callers(cs_db_t *db_ptr, const char *fn_name, int depth)
+void print_callers(FILE *out, cs_db_t *db_ptr, const char *fn_name, int depth)
 {
     auto db = reinterpret_cast<db_t *>(db_ptr);
-    cout << "digraph {" << endl;
-    print_callers_rec(db, fn_name, depth);
-    cout << "}";
+    fprintf(out, "digraph \"Callers to %s\" {", fn_name);
+    print_callers_rec(out, db, fn_name, depth);
+    fprintf(out, "}\n");
+}
+
+// Collect all of the callees to 'fn_name'
+static void print_callees_rec(
+    FILE       *out,
+    db_t       *db,
+    const char *fn_name,
+    int         depth)
+{
+    if (depth <= 0)
+        return;
+
+    for (auto callee: db->hash[fn_name]) {
+        fprintf(out, "    %s -> %s\n", fn_name, callee->name);
+        print_callees_rec(out, db, callee->name, depth - 1);
+    }
+}
+
+#ifdef __cplusplus
+extern "C"
+#endif
+void print_callees(FILE *out, cs_db_t *db_ptr, const char *fn_name, int depth)
+{
+    auto db = reinterpret_cast<db_t *>(db_ptr);
+    fprintf(out, "digraph \"Callees of %s\" {\n", fn_name);
+    print_callees_rec(out, db, fn_name, depth);
+    fprintf(out, "}\n");
 }

@@ -6,6 +6,7 @@
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -15,10 +16,13 @@
 
 static void usage(const char *execname)
 {
-    printf("Usage: %s -c cscope.out -f fn_name [-d depth]\n"
+    printf("Usage: %s -c cscope.out -f fn_name "
+           "-o outputfile[-d depth] <-x | -y>\n"
            "  -c cscope.out: cscope.out database file\n"
            "  -f fn_name:    Function name to plot callers of\n"
            "  -d depth:      Depth of traversal.\n"
+           "  -x:            Print callers of fn_name.\n"
+           "  -y:            Print calless of fn_name.\n"
            "  -h:            This help message.\n",
            execname);
     exit(EXIT_SUCCESS);
@@ -34,13 +38,11 @@ typedef struct { size_t off; size_t data_len; const char *data; } pos_t;
 #define CH(_p)        (VALID(_p) ? (_p)->data[(_p)->off] : EOF)
 #define ERR(...) do {fprintf(stderr,__VA_ARGS__);fputc('\n', stderr);} while(0)
 
-
 #ifdef DEBUG
 #define DBG(...) do {fprintf(stdout,__VA_ARGS__);fputc('\n', stdout);} while(0)
 #else
 #define DBG(...) 
 #endif
-
 
 static void get_line(pos_t *pos, char *buf, size_t buf_len)
 {
@@ -153,7 +155,6 @@ static void init_trailer(cs_t *cs, const void *data, size_t data_len)
     }
 }
 
-
 static cs_file_t *new_file(const char *str)
 {
     cs_file_t *file;
@@ -170,7 +171,6 @@ static cs_file_t *new_file(const char *str)
     return file;
 }
 
-
 static cs_sym_t *new_sym(void)
 {
     cs_sym_t *sym;
@@ -178,7 +178,6 @@ static cs_sym_t *new_sym(void)
       ERR("Out of memory");
     return sym;
 }
-
 
 static _Bool is_mark(char c)
 {
@@ -405,6 +404,7 @@ static cs_t *load_cscope(const char *fname)
 }
 
 
+#if 0
 static void cs_dump(FILE *fp, const cs_t *cs)
 {
     int i;
@@ -426,31 +426,47 @@ static void cs_dump(FILE *fp, const cs_t *cs)
         }
     }
 }
-
+#endif
 
 int main(int argc, char **argv)
 {
     int opt;
-    const char *fname, *fn_name;
+    FILE *out;
+    _Bool do_callees, do_callers;
+    const char *fname, *fn_name, *out_fname;
     cs_t *cs;
     cs_db_t *db;
     int depth = 2;
 
-    fname = fn_name = NULL;
+    do_callers = do_callees = false;
+    fname = out_fname = fn_name = NULL;
 
-    while ((opt = getopt(argc, argv, "c:d:f:h")) != -1) {
+    while ((opt = getopt(argc, argv, "c:d:f:o:hxy")) != -1) {
         switch (opt) {
         case 'c': fname = optarg; break;
         case 'd': depth = atoi(optarg); break;
         case 'f': fn_name = optarg; break;
+        case 'o': out_fname = optarg; break;
+        case 'x': do_callers = true; break;
+        case 'y': do_callees = true; break;
         case 'h': usage(argv[0]); break;
         default: return EXIT_FAILURE;
         }
     }
 
-    if (!fname || !fn_name || depth < 0) {
+    if (!fname || !fn_name || !out_fname || depth < 0) {
         fprintf(stderr, "Invalid options, see '-h'\n");
         return EXIT_FAILURE;
+    }
+
+    /* If the user did not specify callers or callees, do so for them! */
+    if (!do_callers || !do_callees)
+      do_callees = true;
+
+    if (!(out = fopen(out_fname, "w"))) {
+        fprintf(stderr, "Error opening output file %s: %s\n",
+                out_fname, strerror(errno));
+        exit(errno);
     }
 
     /* Load */
@@ -458,7 +474,11 @@ int main(int argc, char **argv)
     db = build_database(cs);
 
     /* Go! */
-    print_callers(db, fn_name, depth);
+    if (do_callers)
+      print_callers(out, db, fn_name, depth);
+    if (do_callees)
+      print_callees(out, db, fn_name, depth);
 
+    fclose(out);
     return 0;
 }
