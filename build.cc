@@ -24,7 +24,11 @@ extern "C"
 #endif
 cs_db_t build_database(const cs_t *cs)
 {
+    int i = 0, spidx = 0;
+    const char spin[] = "-\\|/";
     auto db = new(db_t);
+
+    cout << "Building internal database  ";
 
     for (const cs_file_t *f=cs->files; f; f=f->next) {
         for (const cs_sym_t *fndef=f->functions; fndef; fndef=fndef->next) {
@@ -37,9 +41,12 @@ cs_db_t build_database(const cs_t *cs)
             // Add the funtion_def : calleess map entry
             auto pr = std::make_pair(fndef->name, callees);
             db->hash.insert(pr);
+            if (++i % 10000 == 0)
+              cout << '\b' << spin[spidx++ % 4] << std::flush;
         }
     }
 
+    cout << endl;
     return static_cast<cs_db_t>(db);
 }
 
