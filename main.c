@@ -17,10 +17,11 @@
 static void usage(const char *execname)
 {
     printf("Usage: %s -c cscope.out -f fn_name "
-           "-o outputfile[-d depth] <-x | -y>\n"
+           "[-o outputfile] [-d depth] <-x | -y>\n"
            "  -c cscope.out: cscope.out database file\n"
            "  -f fn_name:    Function name to plot callers of\n"
            "  -d depth:      Depth of traversal.\n"
+           "  -o outputfile: Write results to outputfile.\n"
            "  -x:            Print callers of fn_name.\n"
            "  -y:            Print calless of fn_name.\n"
            "  -h:            This help message.\n",

@@ -88,7 +88,7 @@ extern "C"
 void print_callers(FILE *out, cs_db_t *db_ptr, const char *fn_name, int depth)
 {
     auto db = reinterpret_cast<db_t *>(db_ptr);
-    fprintf(out, "digraph \"Callers to %s\" {", fn_name);
+    fprintf(out, "digraph \"Callers to %s\" {\n", fn_name);
     print_callers_rec(out, db, fn_name, depth);
     fprintf(out, "}\n");
 }
