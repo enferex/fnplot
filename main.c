@@ -455,20 +455,22 @@ int main(int argc, char **argv)
         }
     }
 
-    if (!fname || !fn_name || !out_fname || depth < 0) {
+    if (!fname || !fn_name || depth < 0) {
         fprintf(stderr, "Invalid options, see '-h'\n");
         return EXIT_FAILURE;
     }
 
     /* If the user did not specify callers or callees, do so for them! */
-    if (!do_callers || !do_callees)
+    if (!do_callers && !do_callees)
       do_callees = true;
 
-    if (!(out = fopen(out_fname, "w"))) {
+    if (out_fname && !(out = fopen(out_fname, "w"))) {
         fprintf(stderr, "Error opening output file %s: %s\n",
                 out_fname, strerror(errno));
         exit(errno);
     }
+    else if (!out_fname)
+      out = stdout;
 
     /* Load */
     cs = load_cscope(fname);
