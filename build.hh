@@ -1,7 +1,8 @@
 /*******************************************************************************
  * Copyright (c) 2016, enferex <mattdavis9@gmail.com>
  *
- * ISC License: https://opensource.org/licenses/ISC
+ * ISC License:
+ * https://www.isc.org/downloads/software-support-policy/isc-license/
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
