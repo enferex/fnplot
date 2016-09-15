@@ -1,3 +1,21 @@
+/*******************************************************************************
+ * Copyright (c) 2016, enferex <mattdavis9@gmail.com>
+ *
+ * ISC License: https://opensource.org/licenses/ISC
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+ * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ ******************************************************************************/
+
 #define __USE_POSIX
 #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
@@ -12,7 +30,6 @@
 #include <unistd.h>
 #include "cs.h"
 #include "build.hh"
-
 
 static void usage(const char *execname)
 {
@@ -29,9 +46,7 @@ static void usage(const char *execname)
     exit(EXIT_SUCCESS);
 }
 
-
 typedef struct { size_t off; size_t data_len; const char *data; } pos_t;
-
 
 #define VALID(_p)     ((_p)->off <= (_p)->data_len)
 #define NXT_VALID(_p) ((_p)->off+1 <= (_p)->data_len)
@@ -61,7 +76,6 @@ static void get_line(pos_t *pos, char *buf, size_t buf_len)
     memcpy(buf, pos->data + st, len);
     buf[len] = '\0';
 }
-
 
 /* Header looks like: 
  *     <cscope> <dir> <version> [-c] [-q <symbols>] [-T] <trailer>
@@ -115,7 +129,6 @@ static void init_header(cs_t *cs, const char *data, size_t data_len)
         }
     }
 }
-
 
 static void init_trailer(cs_t *cs, const void *data, size_t data_len)
 {
@@ -289,7 +302,6 @@ static cs_sym_t *load_symbols_in_file(
     return fndef;
 }
 
-
 /* Extract the symbols for file
  * This must start with the <mark><file> line.
  */
@@ -335,7 +347,6 @@ static void file_load_symbols(cs_file_t *file, pos_t *pos)
     }
 }
 
-
 static void init_symbols(cs_t *cs, const char *data, size_t data_len)
 {
     pos_t pos = {0};
@@ -366,7 +377,6 @@ static void init_symbols(cs_t *cs, const char *data, size_t data_len)
         cs->n_functions += file->n_functions;
     }
 }
-
 
 /* Load a cscope database and return a pointer to the data */
 static cs_t *load_cscope(const char *fname)
@@ -403,31 +413,6 @@ static cs_t *load_cscope(const char *fname)
     fclose(fp);
     return cs;
 }
-
-
-#if 0
-static void cs_dump(FILE *fp, const cs_t *cs)
-{
-    int i;
-    const cs_sym_t  *fndef, *fncall;
-    const cs_file_t *f;
-
-    for (f=cs->files; f; f=f->next) {
-        printf("%s: %d function definitions\n", f->name, f->n_functions);
-        i = 0;
-        for (fndef=f->functions; fndef; fndef=fndef->next) {
-            assert(fndef->mark == CS_FN_DEF);
-            fprintf(fp, "%d) %s: %s := {", ++i, f->name, fndef->name);
-            for (fncall=fndef->u.callees; fncall; fncall=fncall->next)
-              printf("%s, ", fncall->name);
-            if (fndef->u.callees)
-              printf("\b\b}\n");
-            else
-              printf("}\n");
-        }
-    }
-}
-#endif
 
 int main(int argc, char **argv)
 {
