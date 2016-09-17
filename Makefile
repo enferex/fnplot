@@ -1,5 +1,5 @@
 CXX=g++
-CXXSRCS=main.cc build.cc
+CXXSRCS=main.cc cs.cc
 COBJS=$(CSRCS:.c=.o)
 CXXOBJS=$(CXXSRCS:.cc=.oo)
 OBJS=$(COBJS) $(CXXOBJS)

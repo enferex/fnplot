@@ -1,3 +1,22 @@
+//******************************************************************************
+// Copyright (c) 2016, enferex <mattdavis9@gmail.com>
+//
+// ISC License:
+// https://www.isc.org/downloads/software-support-policy/isc-license/
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+// REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+// AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+// INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+// LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+// OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+// PERFORMANCE OF THIS SOFTWARE.
+//******************************************************************************
+
 #ifndef _CS_HH
 #define _CS_HH
 #include <string>
@@ -6,60 +25,84 @@
 
 using std::string;
 
-// Database is exposed as an opaque pointer, onlu build.cc knows the magic
-typedef void *cs_db_t;
-
 // Forwards
-struct cs_sym_t;
-struct cs_file_t;
+struct CSSym;
+struct CSFile;
 
 // Hash of symbols
-typedef std::unordered_map<string, std::vector<const cs_sym_t *>> cs_sym_hash_t;
+typedef std::unordered_map<string, const CSSym *> CSSymHash;
+typedef std::unordered_map<string, std::vector<const CSSym *>> CSDB;
 
-// Symbol
-class cs_sym_t
+// Symbol: could be a function definition or function call
+class CSSym
 {
 public:
-    cs_sym_t(const char *name, char mark, size_t line, const cs_file_t *file) :
+    CSSym(const char *name, char mark, size_t line, const CSFile *file) :
         _name(name), _mark(mark), _line(line), _file(file) {}
 
-    char getMark() { return _mark; }
-
-private:
-    string           _name;
-    char             _mark;
-    size_t           _line;
-    const cs_file_t *_file;
-
-    // Use 'mark' field to determine which variant to use
-    union u {
-        cs_sym_hash_t fn_defs; // Function definitions
-        cs_sym_hash_t callees; // Function calls
-    };
-};
-
-
-// A file entry contains a list of symbols
-class cs_file_t
-{
-public:
-    cs_file_t(const char *name, char mark):
-        _name(name), _mark(mark) {}
-
-    cs_sym_t *getCurrentFunction() { return _current_fn; }
+    char getMark() const { return _mark; }
+    string getName() const { return _name; }
 
 private:
     string        _name;
     char          _mark;
-    cs_sym_hash_t _functions;
-
-    // The current function being added to (callees being added).
-    cs_sym_t *_current_fn;
+    size_t        _line;
+    const CSFile *_file;
+    CSSymHash     _fn_defs; // Function definitions
 };
 
+// Symbol: could be a function definition or function call
+class CSFuncCall : public CSSym
+{
+public:
+    CSFuncCall(const char *name, char mark, size_t line, const CSFile *file) :
+        CSSym(name, mark, line, file) {}
+};
+
+// Symbol: could be a function definition or function call
+class CSFuncDef : public CSSym
+{
+public:
+    CSFuncDef(const char *name, char mark, size_t line, const CSFile *file) :
+        CSSym(name, mark, line, file) {}
+
+    // Unique add
+    void addCallee(const CSFuncCall *fncall) {
+        auto pr = std::make_pair<string, const CSSym *>(fncall->getName(), fncall);
+        _callees.insert(pr);
+    }
+
+private:
+        CSSymHash _callees; // Function calls
+};
+
+// A file entry contains a list of symbols, we only collect function calls here.
+class CSFile
+{
+public:
+    CSFile(const char *name, char mark):
+        _name(name), _mark(mark) {}
+
+    CSFuncDef *getCurrentFunction() const { return _current_fndef; }
+    string getName() const { return _name; }
+
+    void addFunctionDef(CSFuncDef *fndef) {
+        auto pr = std::make_pair<string, const CSSym *>(fndef->getName(), fndef);
+        _functions.insert(pr);
+        _current_fndef = fndef;
+    }
+
+private:
+    string    _name;
+    char      _mark;
+    CSSymHash _functions;
+
+    // The current function being added to (callees being added).
+    CSFuncDef *_current_fndef;
+};
 
 // cscope database (cscope.out) header
-struct cs_hdr_t
+struct CSHeader
 {
     int         version;
     bool        compression;    /* -c */
@@ -70,9 +113,8 @@ struct cs_hdr_t
     const char *dir;
 };
 
-
-// cscope database (cscope.out) trailer
-struct cs_trl_t
+//cscope database (cscope.out) trailer
+struct CSTrailer
 {
     int    n_viewpaths;
     char **viewpath_dirs;
@@ -82,30 +124,44 @@ struct cs_trl_t
     char **incs;
 };
 
-
 // cscope database, contains a list of file entries
-struct cs_t
+struct CS
 {
-    cs_hdr_t    hdr;
-    cs_trl_t    trailer;
-    const char *name;
-    int         n_files;
-    int         n_functions;
-    cs_file_t  *files;
+public:
+    CS(const char *fname);
+    void addFile(CSFile *f) { _files.push_back(f); }
+    CSDB *buildDatabase();
+
+private:
+    CSHeader               _hdr;
+    CSTrailer              _trailer;
+    const char            *_name;
+    int                    _n_functions;
+    std::vector<CSFile *>  _files;
+
+    void initHeader(const uint8_t *data, size_t data_size);
+    void initTrailer(const uint8_t *data, size_t data_size);
+    void initSymbols(const uint8_t *data, size_t data_size);
+    void loadCScope();
 };
 
 
 #define CS_FN_DEF  '$'
 #define CS_FN_CALL '`'
-static const char cs_marks[] = 
+static const char cs_marks[] =
 {
     '@', CS_FN_DEF, CS_FN_CALL,
     '}', '#', ')',
-    '~', '=', ';', 
-    'c', 'e', 'g', 
-    'l', 'm', 'p', 
+    '~', '=', ';',
+    'c', 'e', 'g',
+    'l', 'm', 'p',
     's', 't', 'u'
 };
+
+
+// Public routines
+extern void csPrintCallers(FILE *out, CSDB *db, const char *fn_name, int depth);
+extern void csPrintCallees(FILE *out, CSDB *db, const char *fn_name, int depth);
 
 
 #endif // _CS_HH
