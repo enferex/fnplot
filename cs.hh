@@ -66,6 +66,11 @@ public:
     CSFuncDef(const char *name, char mark, size_t line, const CSFile *file) :
         CSSym(name, mark, line, file) {}
 
+    void getCallees(std::vector<const CSFuncCall *> &addem) {
+        for (auto callee: _callees)
+          addem.push_back(static_cast<const CSFuncCall *>(callee.second));
+    }
+
     // Unique add
     void addCallee(const CSFuncCall *fncall) {
         auto pr = std::make_pair<string, const CSSym *>(fncall->getName(), fncall);
@@ -85,6 +90,12 @@ public:
 
     CSFuncDef *getCurrentFunction() const { return _current_fndef; }
     string getName() const { return _name; }
+    void applyToFunctions(void (*fn)(const CSFuncDef *fndef)) {
+        for (auto fndef: _functions) {
+            fn(static_cast<const CSFuncDef *>(fndef.second));
+        }
+    }
+    const CSSymHash &getFunctions() { return _functions; }
 
     void addFunctionDef(CSFuncDef *fndef) {
         auto pr = std::make_pair<string, const CSSym *>(fndef->getName(), fndef);

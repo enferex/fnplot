@@ -241,13 +241,11 @@ CSDB *CS::buildDatabase()
     auto db = new CSDB;
 
     cout << "Building internal database: ";
-    for (const CSFile *f=this->files; f; f=f->next) {
-        for (const CSSym *fndef=f->functions; fndef; fndef=fndef->next) {
-            std::vector<const CSSym *> callees;
-
+    for (auto f: this->_files) {
+        f->applyToFunctions([](const CSFuncDef *fndef) {
             // Collect all calls this function (fndef) makes
-            for (const CSSym *call=fndef->callees; call; call=call->next)
-              callees.push_back(call);
+            std::vector<const CSSym *> callees;
+            fndef->getCallees(callees);
 
             // Add the funtion_def : calleess map entry
             auto pr = std::make_pair(fndef->name, callees);
