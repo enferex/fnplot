@@ -24,31 +24,26 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include "cs.h"
+#include "cs.hh"
 
 using std::cout;
 using std::endl;
 
 // A database is a collection of function definitions mapping to a vector
 // of the calls that the function defintion makes.
-typedef std::unordered_map<std::string, std::vector<const cs_sym_t *>> htype;
 struct db_t
 {
-    htype hash;
+    cs_sym_hash_t hash;
 };
 
 // Create a database 
-#ifdef __cplusplus
-extern "C"
-#endif
 cs_db_t build_database(const cs_t *cs)
 {
     int i = 0, spidx = 0;
     const char spin[] = "-\\|/";
     auto db = new(db_t);
 
-    cout << "Building internal database  ";
-
+    cout << "Building internal database: ";
     for (const cs_file_t *f=cs->files; f; f=f->next) {
         for (const cs_sym_t *fndef=f->functions; fndef; fndef=fndef->next) {
             std::vector<const cs_sym_t *> callees;
@@ -60,13 +55,19 @@ cs_db_t build_database(const cs_t *cs)
             // Add the funtion_def : calleess map entry
             auto pr = std::make_pair(fndef->name, callees);
             db->hash.insert(pr);
-            if (++i % 10000 == 0)
+            if ((++i % 1000) == 0)
               cout << '\b' << spin[spidx++ % 4] << std::flush;
         }
     }
 
     cout << endl;
     return static_cast<cs_db_t>(db);
+}
+
+// Uniquely add to the function callee list
+void cs_add_callee(cs_sym_t *fndef, cs_sym_t *sym)
+{
+    fndef
 }
 
 // Does a call b?
@@ -101,9 +102,6 @@ static void print_callers_rec(
     }
 }
 
-#ifdef __cplusplus
-extern "C"
-#endif
 void print_callers(FILE *out, cs_db_t *db_ptr, const char *fn_name, int depth)
 {
     auto db = reinterpret_cast<db_t *>(db_ptr);
@@ -128,9 +126,6 @@ static void print_callees_rec(
     }
 }
 
-#ifdef __cplusplus
-extern "C"
-#endif
 void print_callees(FILE *out, cs_db_t *db_ptr, const char *fn_name, int depth)
 {
     auto db = reinterpret_cast<db_t *>(db_ptr);

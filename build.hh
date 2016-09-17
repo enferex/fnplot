@@ -19,7 +19,7 @@
 
 #ifndef _BUILD_HH
 #define _BUILD_HH
-#include "cs.h"
+#include "cs.hh"
 
 extern cs_db_t *build_database(const cs_t *cs);
 extern void print_callers(FILE *out, cs_db_t *db, const char *fn_name, int depth);

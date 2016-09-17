@@ -19,17 +19,16 @@
 
 #define __USE_POSIX
 #define _POSIX_C_SOURCE 200809L
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <assert.h>
-#include <ctype.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cassert>
+#include <cctype>
 #include <errno.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include "cs.h"
+#include "cs.hh"
 #include "build.hh"
 
 static void usage(const char *execname)
@@ -47,7 +46,7 @@ static void usage(const char *execname)
     exit(EXIT_SUCCESS);
 }
 
-typedef struct { size_t off; size_t data_len; const char *data; } pos_t;
+typedef struct { size_t off; size_t data_len; const uint8_t *data; } pos_t;
 
 #define VALID(_p)     ((_p)->off <= (_p)->data_len)
 #define NXT_VALID(_p) ((_p)->off+1 <= (_p)->data_len)
@@ -81,7 +80,7 @@ static void get_line(pos_t *pos, char *buf, size_t buf_len)
 /* Header looks like: 
  *     <cscope> <dir> <version> [-c] [-q <symbols>] [-T] <trailer>
  */
-static void init_header(cs_t *cs, const char *data, size_t data_len)
+static void init_header(cs_t *cs, const uint8_t *data, size_t data_len)
 {
     pos_t pos = {0};
     char buf[1024], *tok;
@@ -131,7 +130,7 @@ static void init_header(cs_t *cs, const char *data, size_t data_len)
     }
 }
 
-static void init_trailer(cs_t *cs, const void *data, size_t data_len)
+static void init_trailer(cs_t *cs, const uint8_t *data, size_t data_len)
 {
     int i;
     char line[1024] = {0};
@@ -175,28 +174,16 @@ static cs_file_t *new_file(const char *str)
     cs_file_t *file;
     const char *c = str;
     
-    /* Skip whitespace */
+    // Skip whitespace
     while (isspace(*c))
       ++c;
 
-    if (!(file = calloc(1, sizeof(cs_file_t))))
-      ERR("Out of memory");
-    file->mark = *c;
-    file->name = strdup(c+1);
-    return file;
+    return new cs_file_t(*c, c+1);
 }
 
-static cs_sym_t *new_sym(void)
+static bool is_mark(char c)
 {
-    cs_sym_t *sym;
-    if (!(sym = calloc(1, sizeof(cs_sym_t))))
-      ERR("Out of memory");
-    return sym;
-}
-
-static _Bool is_mark(char c)
-{
-    int i;
+    unsigned i;
     for (i=0; i<sizeof(cs_marks)/sizeof(cs_marks[0]); ++i)
       if (c == cs_marks[i])
         return true;
@@ -219,14 +206,16 @@ static _Bool is_mark(char c)
  *
  * Returns: function definition that was just added, or is being added to.
  */
-static cs_sym_t *load_symbols_in_file(
+static void load_symbols_in_file(
     cs_file_t *file,
     pos_t     *pos,
-    cs_sym_t  *fndef,
     long       lineno)
 {
+    bool added;
     char line[1024], *c, mark;
-    cs_sym_t *sym;
+    cs_sym_t *sym, *fndef;
+
+    fndef = NULL;
     
     /* Suck in only function calls or definitions for this lineno */
     while (VALID(pos)) {
@@ -241,36 +230,33 @@ static cs_sym_t *load_symbols_in_file(
 
         c = line;
 
-        /* Skip spaces and not tabs */
+        // Skip spaces and not tabs
         while (*c == ' ')
           ++c;
 
-        /* <optional mark> */
+        // <optional mark>
         mark = 0;
         if (c[0] == '\t' && is_mark(c[1])) {
             mark = c[1];
             c += 2;
         }
 
-        /* Only accept function definitions or function calls */
+        // Only accept function definitions or function calls
         if (!mark || (mark != CS_FN_DEF && mark != CS_FN_CALL))
           continue;
 
-        /* Skip lines only containing mark characters */
+        // Skip lines only containing mark characters
         if (is_mark(c[0]) && strlen(c+1) == 0)
           continue;
 
-        sym       = new_sym();
-        sym->mark = mark;
-        sym->line = lineno;
-        sym->name = strdup(c);
-        sym->file = file;
+        added = false;
 
-        /* If function call */
-        if (sym->mark == CS_FN_CALL) {
+        // If function call
+        if (sym->getMark() == CS_FN_CALL) {
+            fndef = file->currentFunction();
             if (!fndef) {
-                /* This is probably a macro */
-                free(sym);
+                // This is probably a macro
+                delete sym;
                 continue;
             }
 
@@ -278,29 +264,28 @@ static cs_sym_t *load_symbols_in_file(
              * so the next pointer for a call will be used as a 
              * list of all calls that the function defintiion makes.
              */
-             sym->next = fndef->u.callees;
-             fndef->u.callees = sym;
+             cs_add_callee(fndef, sym);
+             added = true;
         }
-        else if (sym->mark == CS_FN_DEF) { /* If function def */
-            /* Add fn definition to file */
+        else if (sym->getMark() == CS_FN_DEF) { /* If function def */
+            /* Add fn definition to file: Most recently defined is first  */
             fndef = sym;
-            fndef->next = file->functions;
-            file->functions = fndef;
-            ++file->n_functions;
+            cs_add_function_def(file, fndef);
+            added = true;
         }
 
         if (strlen(c) == 0) {
-            free(sym);
-            if (mark == CS_FN_DEF)
-              sym = NULL;
+            delete sym;
             continue;
         }
 
-        /* <non-symbol text> */
+        // <non-symbol text>
         get_line(pos, line, sizeof(line));
-    }
 
-    return fndef;
+        // Cleanup
+        if (!added)
+            delete sym;
+    }
 }
 
 /* Extract the symbols for file
@@ -309,10 +294,8 @@ static cs_sym_t *load_symbols_in_file(
 static void file_load_symbols(cs_file_t *file, pos_t *pos)
 {
     long lineno;
-    cs_sym_t *fn;
     char line[1024], *c;
 
-    fn = NULL;
     DBG("Loading: %s", file->name);
    
     /* <empty line> */
@@ -344,7 +327,7 @@ static void file_load_symbols(cs_file_t *file, pos_t *pos)
          * <line number><blank>
          */
         lineno = atol(c);
-        fn = load_symbols_in_file(file, pos, fn, lineno);
+        load_symbols_in_file(file, pos, lineno);
     }
 }
 
@@ -359,14 +342,14 @@ static void init_symbols(cs_t *cs, const char *data, size_t data_len)
     pos.data_len = data_len;
 
     while (VALID(&pos) && pos.off <= cs->hdr.trailer) {
-        /* Get file info */
+        // Get file info
         get_line(&pos, line, sizeof(line));
         file = new_file(line);
         file_load_symbols(file, &pos);
 
-        /* No-name file */
+        // No-name file
         if (strlen(file->name) == 0) {
-            free(file);
+            delete file;
             continue;
         }
 
