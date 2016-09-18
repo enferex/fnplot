@@ -238,10 +238,16 @@ CSDB *CS::buildDatabase()
 
     cout << "Building internal database: ";
     for (auto f: this->_files) {
+<<<<<<< HEAD
         for (auto fndef_pr: *f->getFunctions()) {
             // Collect all calls this function (fndef) makes
             std::vector<const CSFuncCall *> callees;
             auto fndef = static_cast<const CSFuncDef *>(fndef_pr.second);
+=======
+        for (auto fndef: *f->getFunctions()) {
+            // Collect all calls this function (fndef) makes
+            std::vector<const CSFuncCall *> callees;
+>>>>>>> 4a5e2d10384cd6d5c72f2f923c8e14c03930402c
             fndef->getCallees(callees);
 
             // Add the funtion_def : calleess map entry
@@ -320,7 +326,11 @@ void csPrintCallees(FILE *out, CSDB *db, const char *fn_name, int depth)
 
 // Header looks like:
 //     <cscope> <dir> <version> [-c] [-q <symbols>] [-T] <trailer>
+<<<<<<< HEAD
 void CS::initHeader(const uint8_t *data, size_t data_len)
+=======
+static void CS::initHeader(const uint8_t *data, size_t data_len)
+>>>>>>> 4a5e2d10384cd6d5c72f2f923c8e14c03930402c
 {
     pos_t pos = {0};
     char buf[1024], *tok;
@@ -330,7 +340,11 @@ void CS::initHeader(const uint8_t *data, size_t data_len)
     getLine(&pos, buf, sizeof(buf));
 
     // After the header are the symbols
+<<<<<<< HEAD
     this->_hdr.syms_start = pos.off;
+=======
+    this->hdr.syms_start = pos.off;
+>>>>>>> 4a5e2d10384cd6d5c72f2f923c8e14c03930402c
 
     // Load in the header: <cscope>
     tok = strtok(buf, " ");
@@ -340,10 +354,17 @@ void CS::initHeader(const uint8_t *data, size_t data_len)
     }
 
     // Version
+<<<<<<< HEAD
     this->_hdr.version = atoi(strtok(NULL, " "));
 
     // Directory
     this->_hdr.dir = strndup(strtok(NULL, " "), 1024);
+=======
+    this->hdr.version = atoi(strtok(NULL, " "));
+
+    // Directory
+    this->hdr.dir = strndup(strtok(NULL, " "), 1024);
+>>>>>>> 4a5e2d10384cd6d5c72f2f923c8e14c03930402c
 
     // Optionals: [-c] [-T] [-q <syms>]
     while ((tok = strtok(NULL, " "))) {
@@ -428,7 +449,12 @@ void CS::initSymbols(const uint8_t *data, size_t data_len)
         }
 
         // Add the file to the list of files 
+<<<<<<< HEAD
         this->addFile(file);
         this->_n_functions += file->getFunctionCount();
+=======
+        this->gcaddFile(file);
+        this->gcn_functions += file->n_functions;
+>>>>>>> 4a5e2d10384cd6d5c72f2f923c8e14c03930402c
     }
 }
