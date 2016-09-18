@@ -51,12 +51,12 @@ static void getLine(pos_t *pos, char *buf, size_t buf_len)
 {
     size_t len, st = pos->off;
 
-    /* Get initial line (header line) */
+    // Get initial line (header line)
     while (CH(pos) != EOF && CH(pos) != '\n')
       ++pos->off;
 
-    len = pos->off - st; /* Don't return the '\n'     */
-    ++pos->off;          /* +1 to advance to the '\n' */
+    len = pos->off - st; // Don't return the '\n'
+    ++pos->off;          // +1 to advance to the '\n'
     if (END(pos) || len > buf_len)
       return;
 
@@ -84,22 +84,21 @@ static bool isMark(char c)
     return false;
 }
 
-/* Parse each line in the <file mark><file path>:
- * From docs:
- *
- * and for each source line containing a symbol
- *
- * <line number><blank><non-symbol text>
- * <optional mark><symbol>
- * <non-symbol text>
- * repeat above 2 lines as necessary
- * <empty line>
- *
- * Source:
- * ftp://ftp.eeng.dcu.ie/pub/ee454/cygwin/usr/share/doc/mlcscope-14.1.8/html/cscope.html
- *
- * Returns: function definition that was just added, or is being added to.
- */
+// Parse each line in the <file mark><file path>:
+// From docs:
+//
+// and for each source line containing a symbol
+//
+// <line number><blank><non-symbol text>
+// <optional mark><symbol>
+// <non-symbol text>
+// repeat above 2 lines as necessary
+// <empty line>
+//
+// Source:
+// ftp://ftp.eeng.dcu.ie/pub/ee454/cygwin/usr/share/doc/mlcscope-14.1.8/html/cscope.html
+//
+// Returns: function definition that was just added, or is being added to.
 static void load_symbols_in_file(
     CSFile *file,
     pos_t  *pos,
@@ -163,9 +162,8 @@ static void load_symbols_in_file(
     }
 }
 
-/* Extract the symbols for file
- * This must start with the <mark><file> line.
- */
+// Extract the symbols for file
+// This must start with the <mark><file> line.
 static void fileLoadSymbols(CSFile *file, pos_t *pos)
 {
     long lineno;
@@ -173,40 +171,38 @@ static void fileLoadSymbols(CSFile *file, pos_t *pos)
 
     DBG("Loading: %s", file->name);
 
-    /* <empty line> */
+    // <empty line>
     getLine(pos, line, sizeof(line));
 
-    /* Now parse symbol information for eack line in 'file' */
+    // Now parse symbol information for eack line in 'file'
     while (VALID(pos)) {
-        /* Either this is a symbol, or a file.  If this is a file, then we are
-         * done processing the current file.  So, in that case we break and
-         * restore the position at the start of the next file's data:
-         * <mark><file> line.
-         *
-         * So there are two cases here:
-         * 1) New set of symbols: <lineno><blank><non-symbol text>
-         * 2) A new file: <mark><file>
-         */
+        // Either this is a symbol, or a file.  If this is a file, then we are
+        // done processing the current file.  So, in that case we break and
+        // restore the position at the start of the next file's data:
+        // <mark><file> line.
+        //
+        // So there are two cases here:
+        // 1) New set of symbols: <lineno><blank><non-symbol text>
+        // 2) A new file: <mark><file>
         getLine(pos, line, sizeof(line));
         c = line;
         while (isspace(*c))
           ++c;
 
-        /* Case 2: New file */
+        // Case 2: New file
         if (c[0] == '@') {
             pos->off -= strlen(line);
             return;
         }
 
-        /* Case 1: Symbols at line!
-         * <line number><blank>
-         */
+        // Case 1: Symbols at line!
+        // <line number><blank>
         lineno = atol(c);
         load_symbols_in_file(file, pos, lineno);
     }
 }
 
-/* Load a cscope database and return a pointer to the data */
+// Load a cscope database and return a pointer to the data
 CS::CS(const char *fname)
 {
     FILE *fp;
@@ -216,7 +212,7 @@ CS::CS(const char *fname)
     if (!(fp = fopen(fname, "r")))
       throw("Could not open cscope database file");
 
-    /* mmap the input cscope database */
+    // mmap the input cscope database
     fstat(fileno(fp), &st);
     data = (uint8_t *)mmap(NULL, st.st_size,
                            PROT_READ, MAP_PRIVATE, fileno(fp), 0);
@@ -236,22 +232,23 @@ CS::CS(const char *fname)
 // Create a database
 CSDB *CS::buildDatabase()
 {
-    int i = 0, spidx = 0;
+    int i = 0, sidx = 0;
     const char spin[] = "-\\|/";
     auto db = new CSDB;
 
     cout << "Building internal database: ";
     for (auto f: this->_files) {
-        f->applyToFunctions([](const CSFuncDef *fndef) {
+        for (auto fndef_pr: *f->getFunctions()) {
             // Collect all calls this function (fndef) makes
-            std::vector<const CSSym *> callees;
+            std::vector<const CSFuncCall *> callees;
+            auto fndef = static_cast<const CSFuncDef *>(fndef_pr.second);
             fndef->getCallees(callees);
 
             // Add the funtion_def : calleess map entry
-            auto pr = std::make_pair(fndef->name, callees);
-            db->hash.insert(pr);
+            auto pr = std::make_pair(fndef->getName(), callees);
+            db->insert(pr);
             if ((++i % 1000) == 0)
-              cout << '\b' << spin[spidx++ % 4] << std::flush;
+              cout << '\b' << spin[sidx++ % 4] << std::flush;
         }
     }
 
@@ -260,11 +257,11 @@ CSDB *CS::buildDatabase()
 }
 
 // Does a call b?
-static bool isCallerOf(db_t *db, const char *a, const char *b)
+static bool isCallerOf(CSDB *db, const char *a, const char *b)
 {
     // All the functions 'a' calls
-    for (auto callee: db->hash[a]) {
-        if (strcmp(callee->name, b) == 0)
+    for (auto callee: (*db)[a]) {
+        if (strcmp(callee->getName().c_str(), b) == 0)
             return true;
     }
 
@@ -274,14 +271,14 @@ static bool isCallerOf(db_t *db, const char *a, const char *b)
 // Collect all of the callers to 'fn_name'
 static void printCallersRec(
     FILE       *out,
-    db_t       *db,
+    CSDB       *db,
     const char *fn_name,
     int         depth)
 {
     if (depth <= 0)
-        return;
+      return;
 
-    for (auto pr: db->hash) {
+    for (auto pr: *db) {
         const char *item = pr.first.c_str();
         // Does 'item' call 'fn_name' ?
         if (isCallerOf(db, item, fn_name)) {
@@ -301,31 +298,29 @@ void csPrintCallers(FILE *out, CSDB *db, const char *fn_name, int depth)
 // Collect all of the callees to 'fn_name'
 static void printCalleesRec(
     FILE       *out,
-    db_t       *db,
+    CSDB       *db,
     const char *fn_name,
     int         depth)
 {
     if (depth <= 0)
-        return;
+      return;
 
-    for (auto callee: db->hash[fn_name]) {
-        fprintf(out, "    %s -> %s\n", fn_name, callee->name);
-        printCalleesRec(out, db, callee->name, depth - 1);
+    for (auto callee: (*db)[fn_name]) {
+        fprintf(out, "    %s -> %s\n", fn_name, callee->getName().c_str());
+        printCalleesRec(out, db, callee->getName().c_str(), depth - 1);
     }
 }
 
-void csPrintCallees(FILE *out, CSDB *db_ptr, const char *fn_name, int depth)
+void csPrintCallees(FILE *out, CSDB *db, const char *fn_name, int depth)
 {
-    auto db = reinterpret_cast<db_t *>(db_ptr);
     fprintf(out, "digraph \"Callees of %s\" {\n", fn_name);
-    print_callees_rec(out, db, fn_name, depth);
+    printCalleesRec(out, db, fn_name, depth);
     fprintf(out, "}\n");
 }
 
-/* Header looks like:
- *     <cscope> <dir> <version> [-c] [-q <symbols>] [-T] <trailer>
- */
-static void CS::initHeader(const uint8_t *data, size_t data_len)
+// Header looks like:
+//     <cscope> <dir> <version> [-c] [-q <symbols>] [-T] <trailer>
+void CS::initHeader(const uint8_t *data, size_t data_len)
 {
     pos_t pos = {0};
     char buf[1024], *tok;
@@ -334,45 +329,44 @@ static void CS::initHeader(const uint8_t *data, size_t data_len)
     pos.data_len = data_len;
     getLine(&pos, buf, sizeof(buf));
 
-    /* After the header are the symbols */
-    this->hdr.syms_start = pos.off;
+    // After the header are the symbols
+    this->_hdr.syms_start = pos.off;
 
-    /* Load in the header: <cscope> */
+    // Load in the header: <cscope>
     tok = strtok(buf, " ");
-    if (strncmp(tok, "cscope", strlen("cscope")))
-    {
+    if (strncmp(tok, "cscope", strlen("cscope"))) {
         ERR("This does not appear to be a cscope database");
         return;
     }
 
-    /* Version */
-    this->hdr.version = atoi(strtok(NULL, " "));
+    // Version
+    this->_hdr.version = atoi(strtok(NULL, " "));
 
-    /* Directory */
-    this->hdr.dir = strndup(strtok(NULL, " "), 1024);
+    // Directory
+    this->_hdr.dir = strndup(strtok(NULL, " "), 1024);
 
-    /* Optionals: [-c] [-T] [-q <syms>] */
+    // Optionals: [-c] [-T] [-q <syms>]
     while ((tok = strtok(NULL, " "))) {
         if (tok[0] == '-' && strlen(tok) == 2) {
             if (tok[1] == 'c')
-              this->hdr.compression = true;
+              this->_hdr.compression = true;
             else if (tok[1] == 'T')
-              this->hdr.prefix_match = true;
+              this->_hdr.prefix_match = true;
             else if (tok[1] == 'q')
-              this->hdr.inverted_index = true; // TODO
+              this->_hdr.inverted_index = true; // TODO
             else {
                 ERR("Unrecognized header option");
                 return;
             }
         }
         else {
-            this->hdr.trailer = atol(tok);
+            this->_hdr.trailer = atol(tok);
             break;
         }
     }
 }
 
-static void CS::initTrailer(const uint8_t *data, size_t data_len)
+void CS::initTrailer(const uint8_t *data, size_t data_len)
 {
     int i;
     char line[1024] = {0};
@@ -380,48 +374,48 @@ static void CS::initTrailer(const uint8_t *data, size_t data_len)
 
     pos.data = data;
     pos.data_len = data_len;
-    pos.off = this->hdr.trailer;
+    pos.off = this->_hdr.trailer;
 
     if (!VALID(&pos))
       return;
 
-    /* Viewpaths */
+    // Viewpaths
     getLine(&pos, line, sizeof(line));
-    this->trailer.n_viewpaths = atoi(line);
-    for (i=0; i<this->trailer.n_viewpaths; ++i) {
+    this->_trailer.n_viewpaths = atoi(line);
+    for (i=0; i<this->_trailer.n_viewpaths; ++i) {
         getLine(&pos, line, sizeof(line));
-        DBG("[%d of %d] Viewpath: %s", i+1, this->trailer.n_viewpaths, line);
+        DBG("[%d of %d] Viewpath: %s", i+1, this->_trailer.n_viewpaths, line);
     }
 
-    /* Sources */
+    // Sources
     getLine(&pos, line, sizeof(line));
-    this->trailer.n_srcs = atoi(line);
-    for (i=0; i<this->trailer.n_srcs; ++i) {
+    this->_trailer.n_srcs = atoi(line);
+    for (i=0; i<this->_trailer.n_srcs; ++i) {
         getLine(&pos, line, sizeof(line));
-        DBG("[%d of %d] Sources: %s", i+1, this->trailer.n_srcs, line);
+        DBG("[%d of %d] Sources: %s", i+1, this->_trailer.n_srcs, line);
     }
 
-    /* Includes */
+    // Includes
     getLine(&pos, line, sizeof(line));
-    this->trailer.n_incs = atoi(line);
+    this->_trailer.n_incs = atoi(line);
     getLine(&pos, line, sizeof(line));
-    for (i=0; i<this->trailer.n_incs; ++i) {
+    for (i=0; i<this->_trailer.n_incs; ++i) {
         getLine(&pos, line, sizeof(line));
-        DBG("[%d of %d] Includes: %s", i+1, this->trailer.n_incs, line);
+        DBG("[%d of %d] Includes: %s", i+1, this->_trailer.n_incs, line);
     }
 }
 
-static void CS::initSymbols(const uint8_t *data, size_t data_len)
+void CS::initSymbols(const uint8_t *data, size_t data_len)
 {
     pos_t pos = {0};
     char line[1024];
     CSFile *file;
 
-    pos.off = cs->hdr.syms_start;
+    pos.off = this->_hdr.syms_start;
     pos.data = data;
     pos.data_len = data_len;
 
-    while (VALID(&pos) && pos.off <= this->gchdr.trailer) {
+    while (VALID(&pos) && pos.off <= this->_hdr.trailer) {
         // Get file info
         getLine(&pos, line, sizeof(line));
         file = newFile(line);
@@ -433,8 +427,8 @@ static void CS::initSymbols(const uint8_t *data, size_t data_len)
             continue;
         }
 
-        /* Add the file to the list of files */
-        this->gcaddFile(file);
-        this->gcn_functions += file->n_functions;
+        // Add the file to the list of files 
+        this->addFile(file);
+        this->_n_functions += file->getFunctionCount();
     }
 }
