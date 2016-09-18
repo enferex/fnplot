@@ -87,7 +87,7 @@ class CSFile
 {
 public:
     CSFile(const char *name, char mark):
-        _name(name), _mark(mark) {}
+        _name(name), _mark(mark), _current_fndef(nullptr) {}
 
     CSFuncDef *getCurrentFunction() const { return _current_fndef; }
     string getName() const { return _name; }
