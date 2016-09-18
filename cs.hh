@@ -28,10 +28,11 @@ using std::string;
 // Forwards
 struct CSSym;
 struct CSFile;
+struct CSFuncCall;
 
 // Hash of symbols
 typedef std::unordered_map<string, const CSSym *> CSSymHash;
-typedef std::unordered_map<string, std::vector<const CSSym *>> CSDB;
+typedef std::unordered_map<string, std::vector<const CSFuncCall *>> CSDB;
 
 // Symbol: could be a function definition or function call
 class CSSym
@@ -66,7 +67,7 @@ public:
     CSFuncDef(const char *name, char mark, size_t line, const CSFile *file) :
         CSSym(name, mark, line, file) {}
 
-    void getCallees(std::vector<const CSFuncCall *> &addem) {
+    void getCallees(std::vector<const CSFuncCall *> &addem) const {
         for (auto callee: _callees)
           addem.push_back(static_cast<const CSFuncCall *>(callee.second));
     }
@@ -90,12 +91,7 @@ public:
 
     CSFuncDef *getCurrentFunction() const { return _current_fndef; }
     string getName() const { return _name; }
-    void applyToFunctions(void (*fn)(const CSFuncDef *fndef)) {
-        for (auto fndef: _functions) {
-            fn(static_cast<const CSFuncDef *>(fndef.second));
-        }
-    }
-    const CSSymHash &getFunctions() { return _functions; }
+    const CSSymHash *getFunctions() { return &_functions; }
 
     void addFunctionDef(CSFuncDef *fndef) {
         auto pr = std::make_pair<string, const CSSym *>(fndef->getName(), fndef);
