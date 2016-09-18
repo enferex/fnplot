@@ -99,7 +99,7 @@ static bool isMark(char c)
 // ftp://ftp.eeng.dcu.ie/pub/ee454/cygwin/usr/share/doc/mlcscope-14.1.8/html/cscope.html
 //
 // Returns: function definition that was just added, or is being added to.
-static void load_symbols_in_file(
+static void loadSymbolsInFile(
     CSFile *file,
     pos_t  *pos,
     long    lineno)
@@ -198,7 +198,7 @@ static void fileLoadSymbols(CSFile *file, pos_t *pos)
         // Case 1: Symbols at line!
         // <line number><blank>
         lineno = atol(c);
-        load_symbols_in_file(file, pos, lineno);
+        loadSymbolsInFile(file, pos, lineno);
     }
 }
 
