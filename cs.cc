@@ -290,9 +290,11 @@ static void printCallersRec(
 
 void csPrintCallers(FILE *out, CSDB *db, const char *fn_name, int depth)
 {
+    cout << "Building callers... " << std::flush;
     fprintf(out, "digraph \"Callers to %s\" {\n", fn_name);
     printCallersRec(out, db, fn_name, depth);
     fprintf(out, "}\n");
+    cout << "Done" << endl;
 }
 
 // Collect all of the callees to 'fn_name'
@@ -316,6 +318,7 @@ void csPrintCallees(FILE *out, CSDB *db, const char *fn_name, int depth)
     fprintf(out, "digraph \"Callees of %s\" {\n", fn_name);
     printCalleesRec(out, db, fn_name, depth);
     fprintf(out, "}\n");
+    cout << "Done" << endl;
 }
 
 // Header looks like:
