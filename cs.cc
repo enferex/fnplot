@@ -315,6 +315,7 @@ static void printCalleesRec(
 
 void csPrintCallees(FILE *out, CSDB *db, const char *fn_name, int depth)
 {
+    cout << "Building callees... " << std::flush;
     fprintf(out, "digraph \"Callees of %s\" {\n", fn_name);
     printCalleesRec(out, db, fn_name, depth);
     fprintf(out, "}\n");
