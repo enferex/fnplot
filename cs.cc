@@ -252,7 +252,7 @@ CSDB *CS::buildDatabase()
         }
     }
 
-    cout << endl;
+    cout << '\b' << " Done " << endl;
     return db;
 }
 
